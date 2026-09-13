@@ -11,7 +11,6 @@ permissions:
 env:
   AMBIENTE: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
   TF_VAR_ambiente: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
-  TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
 
 jobs:
   validate:
@@ -27,9 +26,9 @@ jobs:
       - run: terraform validate
 
   plan:
-    name: Plan (prod)
+    name: Plan (${{ github.ref_name == 'main' && 'prod' || 'staging' }})
     needs: validate
-    if: github.ref_name == 'main'
+    if: contains(fromJSON('["main", "develop"]'), github.ref_name)
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -69,11 +68,11 @@ jobs:
         run: terraform plan
 
   apply:
-    name: Apply (prod)
+    name: Apply (${{ github.ref_name == 'main' && 'prod' || 'staging' }})
     needs: plan
-    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main' && needs.plan.outputs.rede == 'true'
+    if: github.event_name == 'workflow_dispatch' && needs.plan.outputs.rede == 'true'
     runs-on: ubuntu-latest
-    environment: prod
+    environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
     permissions:
       id-token: write
       contents: read
