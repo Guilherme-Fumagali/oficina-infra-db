@@ -1,0 +1,88 @@
+name: Terraform
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AMBIENTE: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+
+jobs:
+  validate:
+    name: Format & validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false
+      - run: terraform validate
+
+  plan:
+    name: Plan (prod)
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - run: terraform init -backend-config="key=infra-db/${AMBIENTE}/terraform.tfstate"
+
+      - name: Plan
+        env:
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_ambiente: ${{ env.AMBIENTE }}
+        run: terraform plan -out=tfplan
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ env.AMBIENTE }}
+          path: tfplan
+          retention-days: 1
+
+  apply:
+    name: Apply (prod)
+    needs: plan
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - run: terraform init -backend-config="key=infra-db/${AMBIENTE}/terraform.tfstate"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ env.AMBIENTE }}
+
+      - run: terraform apply -auto-approve tfplan
