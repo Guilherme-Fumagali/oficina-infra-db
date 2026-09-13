@@ -62,10 +62,10 @@ Consumo por `data "aws_ssm_parameter"`, nunca por `terraform_remote_state` — a
 
 ## Execução
 
-O RDS **só sobe pelo workflow Terraform, disparado à mão** (`workflow_dispatch` na `main`), com aprovação no environment `prod`. Merge na `main` roda validate e plan, e o plan é pulado se o cluster estiver desligado; branches rodam só validate. Pré-requisito: a rede já provisionada por `oficina-infra-k8s`.
+O RDS **só sobe pelo workflow Terraform, disparado à mão** na branch do ambiente: `develop` cria `oficina-api-db-staging` (homologação, sem aprovação), `main` cria `oficina-api-db-prod` (produção, com aprovação no environment `prod`). Push em `develop` ou `main` roda validate e plan, e o plan é pulado se o cluster do ambiente estiver desligado; outras branches rodam só validate. Pré-requisito: a rede já provisionada por `oficina-infra-k8s`.
 
 ```bash
-gh workflow run terraform.yml --repo Guilherme-Fumagali/oficina-infra-db --ref main
+gh workflow run terraform.yml --repo Guilherme-Fumagali/oficina-infra-db --ref develop
 ```
 
 Verificação sem credenciais:
@@ -75,10 +75,10 @@ terraform fmt -check -recursive
 terraform init -backend=false && terraform validate
 ```
 
-Destruir ao encerrar a sessão de trabalho — o RDS custa ~US$ 14/mês ligado. Pelo workflow **Destroy AWS**, também com aprovação no environment `prod`:
+Destruir ao encerrar a sessão de trabalho — o RDS custa ~US$ 14/mês ligado. Pelo workflow **Destroy AWS**, na branch do ambiente:
 
 ```bash
-gh workflow run destroy-aws.yml --repo Guilherme-Fumagali/oficina-infra-db --ref main
+gh workflow run destroy-aws.yml --repo Guilherme-Fumagali/oficina-infra-db --ref develop
 ```
 
 Destruir **depois** de `oficina-auth-lambda` e **antes** do cluster de `oficina-infra-k8s`: o Terraform lê a rede do SSM, publicada pelo cluster.
@@ -87,7 +87,9 @@ Destruir **depois** de `oficina-auth-lambda` e **antes** do cluster de `oficina-
 
 ## Deploy
 
-Manual. `main` é protegida, merge só por Pull Request com o check `Format & validate`. O plan roda em todo push na `main`; o apply só por `workflow_dispatch` na `main`, esperando aprovação no environment `prod`. A role da pipeline só aceita token da `main` ou desse environment.
+Manual, por ambiente. `develop` e `main` são protegidas, merge só por Pull Request com o check `Format & validate`. A role da pipeline só aceita token de `develop`/`staging` e `main`/`prod`.
+
+A senha do banco é gerada pelo próprio Terraform (`random_password`), uma por ambiente, e publicada como SecureString no SSM. Não existe secret de banco no GitHub.
 
 Ordem entre repositórios: este é o **passo 2**, depois de `oficina-infra-k8s` criar a rede e antes de `oficina-api` rodar as migrations.
 
