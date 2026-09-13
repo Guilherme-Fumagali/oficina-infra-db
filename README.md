@@ -62,7 +62,7 @@ Consumo por `data "aws_ssm_parameter"`, nunca por `terraform_remote_state` — a
 
 ## Execução
 
-O RDS **só sobe pelo workflow Terraform, disparado à mão** (`workflow_dispatch` na `main`), com aprovação no environment `prod`. Push em qualquer branch, inclusive merge na `main`, roda só a validação. Pré-requisito: a rede já provisionada por `oficina-infra-k8s`.
+O RDS **só sobe pelo workflow Terraform, disparado à mão** (`workflow_dispatch` na `main`), com aprovação no environment `prod`. Merge na `main` roda validate e plan, e o plan é pulado se o cluster estiver desligado; branches rodam só validate. Pré-requisito: a rede já provisionada por `oficina-infra-k8s`.
 
 ```bash
 gh workflow run terraform.yml --repo Guilherme-Fumagali/oficina-infra-db --ref main
@@ -87,7 +87,7 @@ Destruir **depois** de `oficina-auth-lambda` e **antes** do cluster de `oficina-
 
 ## Deploy
 
-Manual. `main` é protegida, merge só por Pull Request com o check `Format & validate`. Plan e apply rodam só por `workflow_dispatch` na `main`, e o apply espera aprovação no environment `prod`. A role da pipeline só aceita token da `main` ou desse environment.
+Manual. `main` é protegida, merge só por Pull Request com o check `Format & validate`. O plan roda em todo push na `main`; o apply só por `workflow_dispatch` na `main`, esperando aprovação no environment `prod`. A role da pipeline só aceita token da `main` ou desse environment.
 
 Ordem entre repositórios: este é o **passo 2**, depois de `oficina-infra-k8s` criar a rede e antes de `oficina-api` rodar as migrations.
 
