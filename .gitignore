@@ -7,3 +7,4 @@ tfplan
 terraform.tfvars
 *.auto.tfvars
 crash.log
+.idea/
