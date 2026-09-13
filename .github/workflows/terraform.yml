@@ -10,6 +10,8 @@ permissions:
 
 env:
   AMBIENTE: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+  TF_VAR_ambiente: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+  TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
 
 jobs:
   validate:
@@ -27,11 +29,13 @@ jobs:
   plan:
     name: Plan (prod)
     needs: validate
-    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main'
+    if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
+    outputs:
+      rede: ${{ steps.rede.outputs.existe }}
     steps:
       - uses: actions/checkout@v4
 
@@ -40,28 +44,34 @@ jobs:
           aws-region: us-east-1
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
+      - name: Conferir rede do oficina-infra-k8s
+        id: rede
+        run: |
+          if SAIDA=$(aws ssm get-parameter --name "/oficina/${AMBIENTE}/vpc-id" 2>&1); then
+            echo "existe=true" >> "$GITHUB_OUTPUT"
+          elif grep -q ParameterNotFound <<<"$SAIDA"; then
+            echo "::notice::Cluster do oficina-infra-k8s desligado, plan pulado."
+            echo "existe=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$SAIDA"
+            exit 1
+          fi
+
       - uses: hashicorp/setup-terraform@v3
+        if: steps.rede.outputs.existe == 'true'
         with:
           terraform_version: "1.9.8"
 
-      - run: terraform init -backend-config="key=infra-db/${AMBIENTE}/terraform.tfstate"
+      - if: steps.rede.outputs.existe == 'true'
+        run: terraform init -backend-config="key=infra-db/${AMBIENTE}/terraform.tfstate"
 
-      - name: Plan
-        env:
-          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
-          TF_VAR_ambiente: ${{ env.AMBIENTE }}
-        run: terraform plan -out=tfplan
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-${{ env.AMBIENTE }}
-          path: tfplan
-          retention-days: 1
+      - if: steps.rede.outputs.existe == 'true'
+        run: terraform plan
 
   apply:
     name: Apply (prod)
     needs: plan
-    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main'
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main' && needs.plan.outputs.rede == 'true'
     runs-on: ubuntu-latest
     environment: prod
     permissions:
@@ -81,8 +91,4 @@ jobs:
 
       - run: terraform init -backend-config="key=infra-db/${AMBIENTE}/terraform.tfstate"
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: tfplan-${{ env.AMBIENTE }}
-
-      - run: terraform apply -auto-approve tfplan
+      - run: terraform apply -auto-approve
