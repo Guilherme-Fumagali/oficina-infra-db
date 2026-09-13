@@ -1,0 +1,45 @@
+name: Destroy AWS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AMBIENTE: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+
+jobs:
+  destroy:
+    name: Destroy (${{ github.ref_name == 'main' && 'prod' || 'staging' }})
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - run: terraform init -backend-config="key=infra-db/${AMBIENTE}/terraform.tfstate"
+
+      - name: Destroy
+        env:
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_ambiente: ${{ env.AMBIENTE }}
+        run: terraform destroy -auto-approve
+
+      - name: Conferir que nada pago sobrou
+        run: |
+          RDS=$(aws rds describe-db-instances --query "DBInstances[?DBInstanceIdentifier=='oficina-api-db-${AMBIENTE}'].[DBInstanceIdentifier,DBInstanceStatus]" --output text)
+          if [ -n "$RDS" ]; then
+            echo "::error::RDS ainda existe: $RDS"
+            exit 1
+          fi
+          echo "RDS oficina-api-db-${AMBIENTE} removido."
