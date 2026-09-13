@@ -14,6 +14,11 @@ data "aws_ssm_parameter" "lambda_security_group_id" {
   name = "/oficina/${var.ambiente}/lambda-security-group-id"
 }
 
+resource "random_password" "db" {
+  length           = 32
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
 locals {
   vpc_id             = data.aws_ssm_parameter.vpc_id.value
   private_subnet_ids = split(",", data.aws_ssm_parameter.private_subnet_ids.value)
@@ -92,7 +97,7 @@ resource "aws_db_instance" "oficina" {
 
   db_name  = var.db_name
   username = var.db_username
-  password = var.db_password
+  password = random_password.db.result
 
   db_subnet_group_name   = aws_db_subnet_group.oficina.name
   vpc_security_group_ids = [aws_security_group.rds.id]
@@ -131,5 +136,5 @@ resource "aws_ssm_parameter" "db_username" {
 resource "aws_ssm_parameter" "db_password" {
   name  = "/oficina/${var.ambiente}/db-password"
   type  = "SecureString"
-  value = var.db_password
+  value = random_password.db.result
 }

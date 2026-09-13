@@ -39,11 +39,6 @@ variable "db_username" {
   default     = "oficina"
 }
 
-variable "db_password" {
-  description = "Senha do usuário administrador. Vem de secret da pipeline, nunca de arquivo versionado."
-  type        = string
-  sensitive   = true
-}
 
 variable "engine_version" {
   description = "Versão do PostgreSQL."
