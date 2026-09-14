@@ -80,6 +80,11 @@ resource "aws_db_parameter_group" "oficina" {
     value = "1"
   }
 
+  parameter {
+    name  = "rds.force_ssl"
+    value = "1"
+  }
+
   lifecycle {
     create_before_destroy = true
   }
@@ -103,7 +108,9 @@ resource "aws_db_instance" "oficina" {
   vpc_security_group_ids = [aws_security_group.rds.id]
   parameter_group_name   = aws_db_parameter_group.oficina.name
 
-  publicly_accessible = false
+  publicly_accessible                 = false
+  iam_database_authentication_enabled = true
+  copy_tags_to_snapshot               = true
 
   multi_az                = false
   skip_final_snapshot     = true
