@@ -144,5 +144,5 @@ A integração é feita pelo SSM Parameter Store, sob `/oficina/<ambiente>/`, li
 ## Limitações
 
 - Instância Single-AZ, sem failover automático.
-- Cerca de 85 conexões simultâneas no `db.t4g.micro`, o que motivou a concorrência reservada de 10 execuções na Lambda.
+- Cerca de 85 conexões simultâneas no `db.t4g.micro`, o que motivou o teto de 10 execuções simultâneas da Lambda.
 - Sem snapshot final na destruição.
