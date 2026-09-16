@@ -24,6 +24,15 @@ jobs:
       - run: terraform fmt -check -recursive
       - run: terraform init -backend=false
       - run: terraform validate
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.55.0
+      - run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: tflint --format compact
+      - name: Checkov
+        run: docker run --rm -v "$PWD:/repo" -w /repo bridgecrew/checkov:3.2.334 -d . --config-file .checkov.yaml
 
   plan:
     name: Plan (${{ github.ref_name == 'main' && 'prod' || 'staging' }})
