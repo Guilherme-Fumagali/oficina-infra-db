@@ -1,5 +1,7 @@
 # oficina-infra-db
 
+> **Fase 4.** A partir da Fase 4, o banco do OS Service é provisionado no diretório `infra/` do repositório [tech-challenge-1](https://github.com/Guilherme-Fumagali/tech-challenge-1), como RDS `oficina-os-db-<ambiente>`, seguindo o padrão de banco por serviço (ADR-022). Os bancos do Billing Service e do Execution Service ficam nos repositórios desses serviços, e a Lambda de autenticação deixou de ler o PostgreSQL, passando a consultar o OS Service por um endpoint interno. Este repositório permanece como registro da Fase 3: o código foi mantido, mas não faz parte da ordem de provisionamento da Fase 4. Um disparo do workflow de apply criaria a instância `oficina-api-db-<ambiente>`, que nenhum serviço utiliza.
+
 Infraestrutura do banco de dados gerenciado do sistema de gestão de oficina mecânica, desenvolvida no Tech Challenge da PosTech FIAP (Arquitetura de Software).
 
 | Repositório | Conteúdo |
